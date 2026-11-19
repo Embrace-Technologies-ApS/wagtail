@@ -1635,7 +1635,7 @@ class TestImageEditView(AdminTemplateTestUtils, WagtailTestUtils, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "wagtailimages/images/edit.html")
 
-    def check_get_missing_file_displays_warning(self):
+    def check_get_missing_file_displays_warning(self, expect_warning):
         # Need to recreate image to use a custom storage per test.
         image = Image.objects.create(title="Test image", file=get_test_image_file())
         image.file.storage.delete(image.file.name)
@@ -1644,9 +1644,14 @@ class TestImageEditView(AdminTemplateTestUtils, WagtailTestUtils, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "wagtailimages/images/edit.html")
         self.assertContains(response, "File not found")
+        warning = "The file for &#x27;Test image&#x27; is missing. Upload a new file or delete the image."
+        if expect_warning:
+            self.assertContains(response, warning)
+        else:
+            self.assertNotContains(response, warning)
 
     def test_get_missing_file_displays_warning_with_default_storage(self):
-        self.check_get_missing_file_displays_warning()
+        self.check_get_missing_file_displays_warning(expect_warning=True)
 
     @override_settings(
         STORAGES={
@@ -1656,8 +1661,9 @@ class TestImageEditView(AdminTemplateTestUtils, WagtailTestUtils, TestCase):
             },
         },
     )
-    def test_get_missing_file_displays_warning_with_custom_storage(self):
-        self.check_get_missing_file_displays_warning()
+    def test_get_missing_file_does_not_display_warning_with_custom_storage(self):
+        # The warning is only shown for images stored on the local filesystem.
+        self.check_get_missing_file_displays_warning(expect_warning=False)
 
     def get_content(self, f=None):
         if f is None:

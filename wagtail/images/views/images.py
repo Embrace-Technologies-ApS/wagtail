@@ -284,7 +284,7 @@ class EditView(generic.EditView):
                 messages.error(
                     self.request,
                     _(
-                        "The source image file could not be found. Please change the source or delete the image."
+                        "The file for '%(image_title)s' is missing. Upload a new file or delete the image."
                     )
                     % {"image_title": self.object.title},
                     buttons=[messages.button(self.get_delete_url(), _("Delete"))],

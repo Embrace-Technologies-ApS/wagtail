@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.http import HttpResponse
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils.text import slugify
 from django.utils.translation import _trans
@@ -33,6 +34,7 @@ from wagtail.coreutils import (
 from wagtail.models import Site
 from wagtail.test.utils import Page
 from wagtail.utils.file import hash_filelike
+from wagtail.utils.sendfile import sendfile
 from wagtail.utils.templates import template_is_overridden
 from wagtail.utils.utils import deep_update, flatten_choices
 from wagtail.utils.version import get_main_version
@@ -647,6 +649,37 @@ class TestTemplateIsOverridden(SimpleTestCase):
                     ),
                     True,
                 )
+
+
+class TestSendfile(SimpleTestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+
+    def make_file(self, filename):
+        path = os.path.join(self.temp_dir.name, filename)
+        with open(path, "wb") as f:
+            f.write(b"example content")
+        return path
+
+    def fake_backend(self, request, filename, mimetype=None):
+        return HttpResponse(b"", content_type=mimetype)
+
+    def test_uncompressed_file_has_no_content_encoding_header(self):
+        path = self.make_file("example.pdf")
+        response = sendfile(None, path, backend=self.fake_backend)
+        self.assertNotIn("Content-Encoding", response.headers)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+
+    def test_gzip_file_has_guessed_content_encoding_header(self):
+        path = self.make_file("example.gz")
+        response = sendfile(None, path, backend=self.fake_backend)
+        self.assertEqual(response["Content-Encoding"], "gzip")
+
+    def test_explicit_encoding_is_used(self):
+        path = self.make_file("example.txt")
+        response = sendfile(None, path, encoding="br", backend=self.fake_backend)
+        self.assertEqual(response["Content-Encoding"], "br")
 
 
 class TestVersion(SimpleTestCase):

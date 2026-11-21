@@ -22,6 +22,10 @@ class TestServeView(TestCase):
         self.pdf_document.file.save(
             "serve_view.pdf", ContentFile(b"A boring example document")
         )
+        self.gzip_document = models.Document(title="Test document", file_hash="123456")
+        self.gzip_document.file.save(
+            "serve_view.gz", ContentFile(b"A boring example document")
+        )
         self.responses = []
 
     def read_response(self, response):
@@ -39,6 +43,7 @@ class TestServeView(TestCase):
         # transactions to trigger transaction.on_commit() in the signal handler
         self.document.file.delete()
         self.pdf_document.file.delete()
+        self.gzip_document.file.delete()
 
     def get(self, document=None, headers=None):
         document = document or self.document
@@ -74,6 +79,12 @@ class TestServeView(TestCase):
 
     def test_no_sniff_content_type(self):
         self.assertEqual(self.get()["X-Content-Type-Options"], "nosniff")
+
+    def test_uncompressed_document_has_no_content_encoding_header(self):
+        self.assertNotIn("Content-Encoding", self.get(self.pdf_document).headers)
+
+    def test_gzip_document_has_gzip_content_encoding_header(self):
+        self.assertEqual(self.get(self.gzip_document)["Content-Encoding"], "gzip")
 
     @mock.patch("wagtail.documents.views.serve.hooks")
     @mock.patch("wagtail.documents.views.serve.get_object_or_404")
